@@ -201,15 +201,29 @@ defmodule TtsClient.TTS.Chunker do
   defp split_line_into_sentences(line) do
     trimmed = String.trim(line)
 
-    # If line is a dialogue line {voice}: text, keep it intact
-    if Regex.match?(@dialogue_pattern, trimmed) do
-      [trimmed]
-    else
-      # Smart sentence splitting that respects parentheses, quotes, and brackets
-      # Don't split on punctuation inside (), [], {}, or ""
-      trimmed
-      |> String.graphemes()
-      |> do_split_sentences([], [], 0, nil)
+    # If line is a dialogue line {voice}: text, extract voice and split the text part
+    case Regex.run(@dialogue_pattern, trimmed) do
+      [prefix, voice] ->
+        # Get the text after {voice}:
+        text_after_prefix = String.replace_prefix(trimmed, prefix, "") |> String.trim()
+
+        # Split the text part into sentences
+        sentences =
+          text_after_prefix
+          |> String.graphemes()
+          |> do_split_sentences([], [], 0, nil)
+
+        # Prepend voice to each sentence
+        Enum.map(sentences, fn sentence ->
+          "{#{voice}}: #{String.trim(sentence)}"
+        end)
+
+      nil ->
+        # Smart sentence splitting that respects parentheses, quotes, and brackets
+        # Don't split on punctuation inside (), [], {}, or ""
+        trimmed
+        |> String.graphemes()
+        |> do_split_sentences([], [], 0, nil)
     end
   end
 
